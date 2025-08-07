@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 9-Box Grid for Parameter Prioritization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .parameter-card {
+            touch-action: none;
+            cursor: grab;
+            user-select: none;
+            position: relative;
+            padding-right: 2rem; /* Make space for delete button */
+        }
+        .parameter-card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+        .grid-box.drag-over {
+            background-color: #e0e7ff;
+            border-style: dashed;
+        }
+        .axis-label-y {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+        }
+        .delete-btn {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            line-height: 1;
+            font-weight: bold;
+            color: #4b5563;
+            cursor: pointer;
+            border: none;
+        }
+        .delete-btn:hover {
+            background-color: #fca5a5;
+            color: #7f1d1d;
+        }
+        #save-message {
+            transition: opacity 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Parameter Prioritization Grid</h1>
+            <p class="text-lg text-gray-600 mt-2">Drag and drop parameters to prioritize them for the Chemical Risk Assessment.</p>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Parameter Bank -->
+            <div id="parameter-bank" class="lg:w-1/4 bg-white p-6 rounded-lg shadow-md flex flex-col">
+                <div>
+                    <h2 class="text-xl font-bold mb-4 text-center">Parameter Bank</h2>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="new-parameter-input" placeholder="Add custom parameter..." class="flex-1 p-2 border border-gray-300 rounded-md text-sm shadow-inner">
+                        <button id="add-parameter-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-semibold">Add</button>
+                    </div>
+                    <div id="parameter-container" class="space-y-3 mb-4 flex-grow">
+                        <!-- Cards will be dynamically generated here -->
+                    </div>
+                </div>
+                <div class="mt-auto">
+                    <div class="mt-6 pt-6 border-t border-gray-200">
+                        <h3 class="text-lg font-bold mb-3 text-center">Stakeholder Details</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="stakeholder-name" class="block text-sm font-medium text-gray-700">Name</label>
+                                <input type="text" id="stakeholder-name" class="mt-1 block w-full p-2 border border-gray-300 rounded-md text-sm shadow-inner">
+                            </div>
+                            <div>
+                                <label for="stakeholder-designation" class="block text-sm font-medium text-gray-700">Designation</label>
+                                <input type="text" id="stakeholder-designation" class="mt-1 block w-full p-2 border border-gray-300 rounded-md text-sm shadow-inner">
+                            </div>
+                            <div>
+                                <label for="stakeholder-agency" class="block text-sm font-medium text-gray-700">Agency</label>
+                                <input type="text" id="stakeholder-agency" class="mt-1 block w-full p-2 border border-gray-300 rounded-md text-sm shadow-inner">
+                            </div>
+                        </div>
+                    </div>
+                    <button id="save-grid-btn" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-semibold mt-6">Save to Google Sheet</button>
+                    <p id="save-message" class="text-center text-sm mt-2 text-gray-600 opacity-0 h-4"></p>
+                </div>
+            </div>
+
+            <!-- 9-Box Grid -->
+            <div class="flex-1 flex items-center">
+                <div class="flex items-center justify-center w-full">
+                    <div class="axis-label-y text-center font-bold text-gray-700 p-2 text-lg">
+                        <span>&rarr; Severity of Impact &rarr;</span>
+                    </div>
+                    <div class="flex flex-col w-full">
+                        <div class="grid grid-cols-3 grid-rows-3 gap-2 bg-gray-200 p-2 rounded-lg shadow-inner w-full h-[75vh] min-h-[600px]">
+                            <!-- Row 1 -->
+                            <div class="grid-box bg-red-100 rounded-md p-3 flex flex-col items-center" data-priority="Secondary Priority">
+                                <h3 class="font-bold text-red-800">Secondary Priority</h3>
+                                <p class="text-xs text-red-600 text-center mb-2">Important but hard to act on.</p>
+                            </div>
+                            <div class="grid-box bg-red-200 rounded-md p-3 flex flex-col items-center" data-priority="High Priority (Core Drivers)">
+                                <h3 class="font-bold text-red-900">High Priority</h3>
+                                <p class="text-xs text-red-700 text-center mb-2">Core risk drivers needing assessment.</p>
+                            </div>
+                            <div class="grid-box bg-red-300 rounded-md p-3 flex flex-col items-center" data-priority="Highest Priority">
+                                <h3 class="font-bold text-red-900">Highest Priority</h3>
+                                <p class="text-xs text-red-800 text-center mb-2">Most critical, actionable parameters.</p>
+                            </div>
+                            <!-- Row 2 -->
+                            <div class="grid-box bg-yellow-100 rounded-md p-3 flex flex-col items-center" data-priority="Lowest Priority (Deprioritized)">
+                                <h3 class="font-bold text-yellow-800">Lowest Priority</h3>
+                                <p class="text-xs text-yellow-600 text-center mb-2">Acknowledge but deprioritize.</p>
+                            </div>
+                            <div class="grid-box bg-yellow-200 rounded-md p-3 flex flex-col items-center" data-priority="Medium Priority (Supporting Data)">
+                                <h3 class="font-bold text-yellow-900">Medium Priority</h3>
+                                <p class="text-xs text-yellow-700 text-center mb-2">Important supporting data.</p>
+                            </div>
+                            <div class="grid-box bg-yellow-300 rounded-md p-3 flex flex-col items-center" data-priority="High Priority (Practical Factors)">
+                                <h3 class="font-bold text-yellow-900">High Priority</h3>
+                                <p class="text-xs text-yellow-800 text-center mb-2">Practical factors to include.</p>
+                            </div>
+                            <!-- Row 3 -->
+                            <div class="grid-box bg-green-100 rounded-md p-3 flex flex-col items-center" data-priority="Exclude">
+                                <h3 class="font-bold text-green-800">Exclude</h3>
+                                <p class="text-xs text-green-600 text-center mb-2">Not relevant or impactful enough.</p>
+                            </div>
+                            <div class="grid-box bg-green-200 rounded-md p-3 flex flex-col items-center" data-priority="Lowest Priority (Contextual)">
+                                <h3 class="font-bold text-green-900">Lowest Priority</h3>
+                                <p class="text-xs text-green-700 text-center mb-2">Useful for context/tie-breaking.</p>
+                            </div>
+                            <div class="grid-box bg-green-300 rounded-md p-3 flex flex-col items-center" data-priority="Medium Priority (Easy Data)">
+                                <h3 class="font-bold text-green-900">Medium Priority</h3>
+                                <p class="text-xs text-green-800 text-center mb-2">Easy data for a complete picture.</p>
+                            </div>
+                        </div>
+                        <div class="text-center font-bold text-gray-700 p-2 text-lg mt-2">
+                            <span>&rarr; Relevance & Measurability &rarr;</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const parameterBank = document.getElementById('parameter-bank');
+            const gridBoxes = document.querySelectorAll('.grid-box');
+            const newParameterInput = document.getElementById('new-parameter-input');
+            const addParameterBtn = document.getElementById('add-parameter-btn');
+            const parameterContainer = document.getElementById('parameter-container');
+            const saveGridBtn = document.getElementById('save-grid-btn');
+            const saveMessage = document.getElementById('save-message');
+
+            const initialParameters = [
+                'Acute Human Toxicity (WHO)', 'Carcinogenicity (Cancer Risk)', 'Ecotoxicity to Marine Life',
+                'Bioaccumulation Potential', 'Persistence in Soil & Water', 'Endocrine Disruption Potential',
+                'Annual Import Volume', 'Widespread Use Across Sectors', 'Dispersive Use (e.g., Spraying)',
+                'Proximity to Sensitive Areas', 'Potential for Improper Disposal'
+            ];
+
+            const addDragListeners = (element) => {
+                element.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', e.target.id);
+                    setTimeout(() => {
+                        e.target.classList.add('dragging');
+                    }, 0);
+                });
+
+                element.addEventListener('dragend', (e) => {
+                    e.target.classList.remove('dragging');
+                });
+            };
+
+            const createParameterCard = (text, id) => {
+                const card = document.createElement('div');
+                card.id = id;
+                card.className = 'parameter-card bg-white p-3 rounded-lg border border-gray-300 shadow-sm';
+                card.draggable = true;
+                
+                const cardText = document.createElement('span');
+                cardText.textContent = text;
+                card.appendChild(cardText);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.onclick = () => card.remove();
+                card.appendChild(deleteBtn);
+
+                addDragListeners(card);
+                return card;
+            };
+
+            initialParameters.forEach((text, index) => {
+                const card = createParameterCard(text, `param-${index + 1}`);
+                parameterContainer.appendChild(card);
+            });
+            
+            const allDropZones = [...gridBoxes, parameterBank];
+
+            allDropZones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (zone.classList.contains('grid-box')) {
+                       zone.classList.add('drag-over');
+                    }
+                });
+
+                zone.addEventListener('dragleave', (e) => {
+                    if (zone.classList.contains('grid-box')) {
+                        zone.classList.remove('drag-over');
+                    }
+                });
+
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (zone.classList.contains('grid-box')) {
+                        zone.classList.remove('drag-over');
+                    }
+                    
+                    const id = e.dataTransfer.getData('text/plain');
+                    const draggable = document.getElementById(id);
+                    
+                    if (zone.id === 'parameter-bank') {
+                        parameterContainer.appendChild(draggable);
+                    } else {
+                        zone.appendChild(draggable);
+                    }
+                });
+            });
+
+            const addNewParameter = () => {
+                const text = newParameterInput.value.trim();
+                if (!text) return;
+                const card = createParameterCard(text, `param-${Date.now()}`);
+                parameterContainer.appendChild(card);
+                newParameterInput.value = '';
+                newParameterInput.focus();
+            };
+
+            const saveGridState = () => {
+                // IMPORTANT: Replace this with your actual Google Apps Script Web App URL
+                const googleScriptURL = 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE';
+
+                if (googleScriptURL === 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+                    saveMessage.textContent = 'Error: Please set the script URL.';
+                    saveMessage.style.color = 'red';
+                    saveMessage.style.opacity = '1';
+                    return;
+                }
+
+                saveMessage.textContent = 'Saving...';
+                saveMessage.style.color = '#4b5563';
+                saveMessage.style.opacity = '1';
+                saveGridBtn.disabled = true;
+
+                const stakeholderName = document.getElementById('stakeholder-name').value;
+                const stakeholderDesignation = document.getElementById('stakeholder-designation').value;
+                const stakeholderAgency = document.getElementById('stakeholder-agency').value;
+
+                const gridArrangement = {};
+                gridBoxes.forEach(box => {
+                    const priority = box.dataset.priority;
+                    const cards = Array.from(box.querySelectorAll('.parameter-card'));
+                    gridArrangement[priority] = cards.map(card => card.querySelector('span').textContent);
+                });
+
+                const bankCards = Array.from(parameterContainer.querySelectorAll('.parameter-card'));
+                gridArrangement['Parameter Bank'] = bankCards.map(card => card.querySelector('span').textContent);
+
+                const finalState = {
+                    stakeholderInfo: {
+                        name: stakeholderName,
+                        designation: stakeholderDesignation,
+                        agency: stakeholderAgency
+                    },
+                    gridArrangement: gridArrangement
+                };
+
+                fetch(googleScriptURL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Important for simple Apps Script web apps
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(finalState)
+                })
+                .then(() => {
+                    saveMessage.textContent = 'Data saved successfully!';
+                    saveMessage.style.color = 'green';
+                })
+                .catch(error => {
+                    saveMessage.textContent = 'Error saving data.';
+                    saveMessage.style.color = 'red';
+                    console.error('Error:', error);
+                })
+                .finally(() => {
+                    saveGridBtn.disabled = false;
+                    setTimeout(() => {
+                       saveMessage.style.opacity = '0';
+                    }, 3000);
+                });
+            };
+
+            addParameterBtn.addEventListener('click', addNewParameter);
+            newParameterInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addNewParameter();
+                }
+            });
+            saveGridBtn.addEventListener('click', saveGridState);
+        });
+    </script>
+</body>
+</html>
